@@ -1,0 +1,16 @@
+# Lives in src/ so it only lints the code you write.
+# HeaderFilterRegex keeps diagnostics to src/ even when external headers are pulled in.
+# The C++ standard (C++23) comes from build/compile_commands.json, so run via `just tidy`.
+---
+Checks: >
+  -*,
+  bugprone-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -modernize-avoid-c-arrays
+HeaderFilterRegex: '.*/src/.*'
+FormatStyle: file
+WarningsAsErrors: ''

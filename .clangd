@@ -1,0 +1,4 @@
+# Zed/clangd: find the compile database CMake generates in build/.
+# Run `just configure` once so build/compile_commands.json exists.
+CompileFlags:
+  CompilationDatabase: build
