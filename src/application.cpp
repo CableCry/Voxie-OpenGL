@@ -206,6 +206,10 @@ auto Application::create() -> std::expected<Application, std::string> {
         return std::unexpected{std::move(r.error())};
     }
 
+    if (auto r = app.loadShader("triangle2", "triangle.vert", "triangle2.frag"); !r) {
+        return std::unexpected{std::move(r.error())};
+    }
+
     return app;
 }
 

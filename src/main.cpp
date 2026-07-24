@@ -45,7 +45,9 @@ auto main() -> int try {
 
         app.shader("triangle").use();
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, TRIS.size() / 3);
+        glDrawArrays(GL_TRIANGLES, 0, (TRIS.size() / 3) / 2);
+        app.shader("triangle2").use();
+        glDrawArrays(GL_TRIANGLES, 3, (TRIS.size() / 3) / 2);
 
         app.pollAndSwap();
     }
