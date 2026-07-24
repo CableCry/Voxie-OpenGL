@@ -30,7 +30,7 @@ add_library(stb STATIC external/stb/stb_image.cpp)
 target_include_directories(stb PUBLIC external/stb)
 
 # --- App --------------------------------------------------------------------
-add_executable(voxel src/main.cpp src/application.cpp)
+add_executable(voxel src/main.cpp src/application.cpp src/mesh.cpp)
 target_link_libraries(voxel PRIVATE glfw glm::glm glad_gl_core_46 stb)
 
 # Point the app at the shader source dir (dev convenience; no copy step).

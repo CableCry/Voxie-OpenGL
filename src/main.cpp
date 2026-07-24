@@ -1,5 +1,6 @@
 #include "application.hpp"
 #include "logging.hpp"
+#include "mesh.hpp"
 
 #include <array>
 #include <exception>
