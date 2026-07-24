@@ -10,27 +10,42 @@ auto main() -> int try {
 
     auto app = orDieExp(Application::create(), "Application::create");
 
-    const std::array<float, 12> SQUARE{
-        -0.5F, -0.5F, +0.0F, // bottom-left
-        +0.5F, +0.5F, +0.0F, // top-right
-        -0.5F, +0.5F, +0.0F, // top-left
-        +0.5F, -0.5F, +0.0F, // bottom-right
-    };
-    const std::array<GLuint, 6> SQUARE_INDEX{0, 1, 2, 0, 3, 1};
+    const std::array<float, 18> TRIS{
+        -0.75, -0.5, +0.0F, // 1 BL
+        -0.25, -0.5, +0.0F, // 1 BR
+        -0.5,  +0.5, +0.0F, // 1 T
 
-    const std::array<Mesh::Attrib, 1> attribs{
-        Mesh::Attrib{.location = 0, .components = 3, .offset = 0},
+        +0.75, -0.5, +0.0F, // 1 BL
+        +0.25, -0.5, +0.0F, // 1 BR
+        +0.5,  +0.5, +0.0F, // 1 T
     };
-    const auto square = Mesh::create(SQUARE, SQUARE_INDEX, 3 * sizeof(float), attribs);
+
+    GLuint VBO = 0;
+    GLuint VAO = 0;
+
+    glCreateVertexArrays(1, &VAO);
+    glCreateBuffers(1, &VBO);
+
+    // flags = 0: filled at creation, never written or mapped again
+    glNamedBufferStorage(VBO, TRIS.size() * sizeof(float), TRIS.data(), GL_NONE);
+    glEnableVertexArrayAttrib(VAO, 0);
+    glVertexArrayAttribFormat(VAO, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribBinding(VAO, 0, 0);
+    std::cout << "HERE 1 \n";
+
+    glVertexArrayVertexBuffer(VAO, 0, VBO, 0, 3 * sizeof(float));
+    std::cout << "HERE 2 \n";
 
     app.shader("triangle").use();
+    std::cout << "HERE 3 \n";
 
     while (!app.window.shouldClose()) {
         app.processInput();
         Window::clearScreen();
 
         app.shader("triangle").use();
-        square.draw();
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, TRIS.size() / 3);
 
         app.pollAndSwap();
     }
