@@ -6,7 +6,10 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 
 // ponytail: one session per Window. Fine while exactly one Window exists; the first
@@ -60,6 +63,40 @@ class Window {
     WindowPtr window_;
 };
 
+// One drawable: vertices + indices packed into a single immutable VBO (megabuffer),
+// with a VAO describing the interleaved vertex layout. Owns both, deletes on destruction.
+class Mesh {
+  public:
+    // Describes one vertex attribute in the interleaved vertex data.
+    struct Attrib {
+        GLuint location;        // shader `layout(location = N)`
+        GLint components;       // e.g. 3 for a vec3
+        GLuint offset;          // byte offset of this attribute within a vertex
+        GLenum type = GL_FLOAT; //
+        GLboolean normalize = GL_FALSE;
+    };
+
+    // vertexStride: bytes per vertex (e.g. 3 * sizeof(float) for tight vec3 positions).
+    [[nodiscard]] static auto create(std::span<const float> vertices,
+                                     std::span<const GLuint> indices, GLsizei vertexStride,
+                                     std::span<const Attrib> attribs) -> Mesh;
+
+    void draw(GLenum mode = GL_TRIANGLES) const;
+
+    ~Mesh();
+    Mesh(Mesh&& o) noexcept;
+    auto operator=(Mesh&& o) noexcept -> Mesh&;
+    Mesh(const Mesh&) = delete;
+    auto operator=(const Mesh&) -> Mesh& = delete;
+
+  private:
+    Mesh() = default;
+    GLuint vao_ = 0;
+    GLuint vbo_ = 0;
+    GLsizei indexCount_ = 0;
+    GLintptr indexOffset_ = 0; // byte offset where indices begin inside vbo_
+};
+
 class Application {
   public:
     static constexpr int WIDTH = 1920;
@@ -72,10 +109,27 @@ class Application {
 
     void processInput();
     void pollAndSwap();
+
+    // Compile vert+frag and store under `name`, replacing any existing shader of that name.
+    [[nodiscard]] auto loadShader(std::string name, std::string_view vert, std::string_view frag)
+        -> std::expected<void, std::string>;
+    // Access a stored shader. Precondition: `name` was loaded (asserted).
+    [[nodiscard]] auto shader(std::string_view name) -> Shader&;
+
     Window window;
-    Shader shader;
 
   private:
-    Application(Window window, Shader shader)
-        : window{std::move(window)}, shader{std::move(shader)} {};
+    explicit Application(Window window) : window{std::move(window)} {};
+
+    // transparent hash: look up by string_view without allocating a key each frame
+    struct StringHash {
+        using is_transparent = void;
+        auto operator()(std::string_view s) const noexcept -> std::size_t {
+            return std::hash<std::string_view>{}(s);
+        }
+    };
+    std::unordered_map<std::string, Shader, StringHash, std::equal_to<>> shaders_;
+
+    bool debugMode_ = false;
+    bool debugKeyDown_ = false; // prev-frame key state, for rising-edge toggle
 };

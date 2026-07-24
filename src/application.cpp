@@ -5,6 +5,7 @@
 #include "logging.hpp"
 #include "shader.hpp"
 
+#include <cassert>
 #include <expected>
 #include <string>
 #include <string_view>
@@ -100,6 +101,58 @@ void Window::clearScreen() noexcept {
     glClear(GL_COLOR_BUFFER_BIT);
 }
 
+auto Mesh::create(std::span<const float> vertices, std::span<const GLuint> indices,
+                  GLsizei vertexStride, std::span<const Mesh::Attrib> attribs) -> Mesh {
+    const GLsizeiptr vBytes = static_cast<GLsizeiptr>(vertices.size_bytes());
+    const GLsizeiptr iBytes = static_cast<GLsizeiptr>(indices.size_bytes());
+
+    Mesh mesh;
+    mesh.indexCount_ = static_cast<GLsizei>(indices.size());
+    mesh.indexOffset_ = vBytes; // indices packed right after vertices
+
+    glCreateVertexArrays(1, &mesh.vao_);
+    glCreateBuffers(1, &mesh.vbo_);
+
+    glNamedBufferStorage(mesh.vbo_, vBytes + iBytes, nullptr, GL_DYNAMIC_STORAGE_BIT);
+    glNamedBufferSubData(mesh.vbo_, 0, vBytes, vertices.data());
+    glNamedBufferSubData(mesh.vbo_, vBytes, iBytes, indices.data());
+
+    for (const auto& a : attribs) {
+        glEnableVertexArrayAttrib(mesh.vao_, a.location);
+        glVertexArrayAttribFormat(mesh.vao_, a.location, a.components, a.type, a.normalize,
+                                  a.offset);
+        glVertexArrayAttribBinding(mesh.vao_, a.location, 0);
+    }
+
+    glVertexArrayVertexBuffer(mesh.vao_, 0, mesh.vbo_, 0, vertexStride);
+    glVertexArrayElementBuffer(mesh.vao_, mesh.vbo_);
+
+    return mesh;
+}
+
+void Mesh::draw(GLenum mode) const {
+    glBindVertexArray(vao_);
+    glDrawElements(mode, indexCount_, GL_UNSIGNED_INT, reinterpret_cast<void*>(indexOffset_));
+}
+
+Mesh::~Mesh() {
+    glDeleteVertexArrays(1, &vao_); // 0 is silently ignored by GL
+    glDeleteBuffers(1, &vbo_);
+}
+
+Mesh::Mesh(Mesh&& o) noexcept
+    : vao_{std::exchange(o.vao_, 0)}, vbo_{std::exchange(o.vbo_, 0)},
+      indexCount_{std::exchange(o.indexCount_, 0)}, indexOffset_{std::exchange(o.indexOffset_, 0)} {
+}
+
+auto Mesh::operator=(Mesh&& o) noexcept -> Mesh& {
+    std::swap(vao_, o.vao_);
+    std::swap(vbo_, o.vbo_);
+    std::swap(indexCount_, o.indexCount_);
+    std::swap(indexOffset_, o.indexOffset_);
+    return *this;
+}
+
 namespace {
 
 // GL reports asynchronously; without this every failed call is silent.
@@ -146,18 +199,44 @@ auto Application::create() -> std::expected<Application, std::string> {
     glfwGetFramebufferSize(window->handle(), &fbw, &fbh);
     glViewport(0, 0, fbw, fbh);
 
-    auto shader = Shader::create("triangle.vert", "triangle.frag");
-    if (!shader) {
-        return std::unexpected{std::move(shader.error())};
+    Application app{std::move(*window)};
+
+    // default shader; call app.loadShader(...) for more.
+    if (auto r = app.loadShader("triangle", "triangle.vert", "triangle.frag"); !r) {
+        return std::unexpected{std::move(r.error())};
     }
 
-    return Application{std::move(*window), std::move(*shader)};
+    return app;
+}
+
+auto Application::loadShader(std::string name, std::string_view vert, std::string_view frag)
+    -> std::expected<void, std::string> {
+    auto sh = Shader::create(vert, frag);
+    if (!sh) {
+        return std::unexpected{std::move(sh.error())};
+    }
+    shaders_.insert_or_assign(std::move(name), std::move(*sh));
+    return {};
+}
+
+auto Application::shader(std::string_view name) -> Shader& {
+    auto it = shaders_.find(name);
+    assert(it != shaders_.end() && "shader not loaded");
+    return it->second;
 }
 
 void Application::processInput() {
     if (window.isKeyPressed(GLFW_KEY_ESCAPE)) {
         window.requestClose();
     }
+
+    // rising edge only, else a held key toggles every frame
+    const bool down = window.isKeyPressed(GLFW_KEY_GRAVE_ACCENT);
+    if (down && !debugKeyDown_) {
+        debugMode_ = !debugMode_;
+        glPolygonMode(GL_FRONT_AND_BACK, debugMode_ ? GL_LINE : GL_FILL);
+    }
+    debugKeyDown_ = down;
 }
 
 void Application::pollAndSwap() {
