@@ -95,6 +95,9 @@ class Shader {
     void set(std::string_view n, float v) {
         glUniform1f(loc(n), v);
     }
+    void set(std::string_view n, float x, float y) {
+        glUniform2f(loc(n), x, y);
+    }
     void set(std::string_view n, float x, float y, float z) {
         glUniform3f(loc(n), x, y, z);
     }

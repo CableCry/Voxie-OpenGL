@@ -94,8 +94,6 @@ auto Window::create(int w, int h, const char* title) -> std::expected<Window, st
         return std::unexpected{"glfwCreateWindow() failed"};
     }
 
-    glfwSetFramebufferSizeCallback(handle.get(), Window::onResizeCallback);
-
     Log::ok("GLFW {}", glfwGetVersionString());
 
     return Window{std::move(*session), std::move(handle)};
@@ -121,8 +119,11 @@ auto Window::isKeyPressed(int key) const noexcept -> bool {
     return glfwGetKey(window_.get(), key) == GLFW_PRESS;
 }
 
-void Window::onResizeCallback(GLFWwindow* /*window*/, int width, int height) {
-    glViewport(0, 0, width, height);
+auto Window::framebufferSize() const noexcept -> std::pair<int, int> {
+    int w = 0;
+    int h = 0;
+    glfwGetFramebufferSize(window_.get(), &w, &h);
+    return {w, h};
 }
 
 void Window::swapBuffers() noexcept {
@@ -148,10 +149,8 @@ auto Application::create() -> std::expected<Application, std::string> {
     }
     enableDebugOutput();
 
-    int fbw = 0;
-    int fbh = 0;
-    glfwGetFramebufferSize(window->handle(), &fbw, &fbh);
-    glViewport(0, 0, fbw, fbh);
+    // no initial glViewport: GL starts it at the size of the window the context first
+    // attaches to, and the frame loop re-syncs it on every size change.
 
     Application app{std::move(*window)};
 

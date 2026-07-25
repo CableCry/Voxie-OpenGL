@@ -55,7 +55,12 @@ class Window {
 
     [[nodiscard]] auto isKeyPressed(int key) const noexcept -> bool;
 
-    static void onResizeCallback(GLFWwindow* window, int width, int height);
+    // ponytail: polled, not a resize callback. GLFW callbacks only carry a GLFWwindow*,
+    // so reaching back to C++ state needs glfwSetWindowUserPointer(this) -- which dangles
+    // the moment a move-only Window is moved. Poll once a frame instead; events are
+    // already pumped in pollAndSwap(). Switch to a callback if resize must be handled
+    // mid-frame or while the OS blocks the loop (live-drag on Win32).
+    [[nodiscard]] auto framebufferSize() const noexcept -> std::pair<int, int>;
 
     // static: acts on the current GL context, not on this window's state.
     static void clearScreen() noexcept;
