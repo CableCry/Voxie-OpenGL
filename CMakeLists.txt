@@ -30,13 +30,14 @@ add_library(stb STATIC external/stb/stb_image.cpp)
 target_include_directories(stb PUBLIC external/stb)
 
 # --- App --------------------------------------------------------------------
-add_executable(voxel src/main.cpp src/application.cpp src/mesh.cpp)
+add_executable(voxel src/main.cpp src/application.cpp src/mesh.cpp src/texture.cpp)
 target_link_libraries(voxel PRIVATE glfw glm::glm glad_gl_core_46 stb)
 
 # Point the app at the shader source dir (dev convenience; no copy step).
 # ponytail: switch to copying shaders next to the binary when you ship a build.
 target_compile_definitions(voxel PRIVATE
-  SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+  SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+  ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
 if(WIN32)
   target_link_libraries(voxel PRIVATE opengl32)

@@ -17,9 +17,16 @@ class Mesh {
     };
 
     // vertexStride: bytes per vertex (e.g. 3 * sizeof(float) for tight vec3 positions).
+    // Empty indices => non-indexed mesh, drawn with glDrawArrays.
     [[nodiscard]] static auto create(std::span<const float> vertices,
                                      std::span<const GLuint> indices, GLsizei vertexStride,
                                      std::span<const Attrib> attribs) -> Mesh;
+
+    // Non-indexed: vertices are drawn in order.
+    [[nodiscard]] static auto create(std::span<const float> vertices, GLsizei vertexStride,
+                                     std::span<const Attrib> attribs) -> Mesh {
+        return create(vertices, {}, vertexStride, attribs);
+    }
 
     void draw(GLenum mode = GL_TRIANGLES) const;
 
@@ -34,6 +41,7 @@ class Mesh {
 
     GLuint vao_ = 0;
     GLuint vbo_ = 0;
-    GLsizei indexCount_ = 0;
+    GLsizei vertexCount_ = 0;
+    GLsizei indexCount_ = 0; // 0 => non-indexed
     GLintptr indexOffset_ = 0; // byte offset where indices begin inside vbo_
 };

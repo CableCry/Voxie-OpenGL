@@ -1,11 +1,13 @@
 #pragma once
 
 #include "shader.hpp"
+#include "texture.hpp"
 
 #include <expected>
 #include <glad/gl.h> // must precede GLFW: GLFW pulls in a system GL header otherwise
 #include <GLFW/glfw3.h>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -87,11 +89,29 @@ class Application {
     void processInput();
     void pollAndSwap();
 
+    // Polls the framebuffer size and re-syncs glViewport when it changed. Returns the new
+    // size (as floats, ready for a `resolution` uniform) only on a change, else nullopt --
+    // pushing it to shaders is the caller's job. 0x0 (minimized) is ignored: a 0 resolution
+    // NaNs the aspect divide in the shader.
+    auto syncViewport() -> std::optional<std::pair<float, float>>;
+
     // Compile vert+frag and store under `name`, replacing any existing shader of that name.
     [[nodiscard]] auto loadShader(std::string name, std::string_view vert, std::string_view frag)
         -> std::expected<void, std::string>;
     // Access a stored shader. Precondition: `name` was loaded (asserted).
     [[nodiscard]] auto shader(std::string_view name) -> Shader&;
+
+    // Load `file` (relative to ASSET_DIR) and store under `name`, replacing any existing
+    // texture of that name.
+    [[nodiscard]] auto loadTexture(std::string name, std::string_view file,
+                                   const Texture::Params& params)
+        -> std::expected<void, std::string>;
+    [[nodiscard]] auto loadTexture(std::string name, std::string_view file)
+        -> std::expected<void, std::string> {
+        return loadTexture(std::move(name), file, Texture::Params{});
+    }
+    // Access a stored texture. Precondition: `name` was loaded (asserted).
+    [[nodiscard]] auto texture(std::string_view name) -> Texture&;
 
     Window window;
 
@@ -106,7 +126,9 @@ class Application {
         }
     };
     std::unordered_map<std::string, Shader, StringHash, std::equal_to<>> shaders_;
+    std::unordered_map<std::string, Texture, StringHash, std::equal_to<>> textures_;
 
     bool debugMode_ = false;
-    bool debugKeyDown_ = false; // prev-frame key state, for rising-edge toggle
+    bool debugKeyDown_ = false;         // prev-frame key state, for rising-edge toggle
+    std::pair<int, int> lastSize_{0, 0}; // {0,0} => first frame always syncs
 };

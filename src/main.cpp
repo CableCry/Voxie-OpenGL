@@ -3,6 +3,7 @@
 #include "mesh.hpp"
 
 #include <array>
+#include <cstddef>
 #include <exception>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -12,39 +13,50 @@ auto main() -> int try {
 
     auto app = orDieExp(Application::create(), "Application::create");
 
-    const std::array<float, 24> SQUARE{
-        -0.5F, -0.5F, +0.0F, 1.0F, 0.0F, 0.0F, // bottom-left
-        +0.5F, +0.5F, +0.0F, 0.0F, 1.0F, 0.0F, // top-right
-        -0.5F, +0.5F, +0.0F, 0.0F, 0.0F, 1.0F, // top-left
-        +0.5F, -0.5F, +0.0F, 1.0F, 0.0F, 0.0F, // bottom-right
+    // pos3, color3, uv2
+    //    const std::array<float, 24> TRIANGLE{
+    //        -0.5F, -0.5F, +0.0F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, // bottom-left
+    //        +0.5F, -0.5F, +0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.0F, // bottom-right
+    //        +0.0F, +0.5F, +0.0F, 1.0F, 1.0F, 1.0F, 0.5F, 1.0F, // top
+    //    };
+
+    const std::array<float, 24> TRIANGLE_OF_GOON{
+        +0.0F, -0.5F, +0.0F, 1.0F, 1.0F, 1.0F, 0.5F, 0.0F, // bottom-left
+        +0.5F, +0.5F, +0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F, // bottom-right
+        -0.5F, +0.5F, +0.0F, 1.0F, 1.0F, 1.0F, 0.0F, 1.0F, // top
     };
-    const std::array<GLuint, 6> SQUARE_INDEX{0, 2, 4, 0, 6, 2};
 
-    const std::array<Mesh::Attrib, 2> attribs{
-        Mesh::Attrib{.location = 0, .components = 3, .offset = 0},                    // Points
-        Mesh::Attrib{.location = 1, .components = 3, .offset = (3 * sizeof(float))}}; // Color
+    const std::array<Mesh::Attrib, 3> TRIANGLE_ATTRIB{
+        Mesh::Attrib{.location = 0, .components = 3, .offset = 0},
+        Mesh::Attrib{.location = 1, .components = 3, .offset = (3 * sizeof(float))},
+        Mesh::Attrib{.location = 2, .components = 2, .offset = (6 * sizeof(float))},
+    };
 
-    const auto square = Mesh::create(SQUARE, SQUARE_INDEX, 3 * sizeof(float), attribs);
+    const auto triangle = Mesh::create(TRIANGLE_OF_GOON, 8 * sizeof(float), TRIANGLE_ATTRIB);
 
-    std::pair<int, int> lastSize{}; // {0,0} => first frame always syncs
+    if (auto r = app.loadTexture(
+            "wall", "texture.png",
+            {.wrapS = GL_MIRRORED_REPEAT, .wrapT = GL_MIRRORED_REPEAT, .mipmaps = true});
+        !r) {
+        Log::error("loadTexture: {}", r.error());
+    }
+
+    app.shader("triangle").use();
+    app.shader("triangle").set("tex", 0); // sampler reads texture unit 0
 
     while (!app.window.shouldClose()) {
         app.processInput();
 
-        // minimized windows report 0x0; a 0 resolution NaNs the aspect divide in the shader
-        if (const auto size = app.window.framebufferSize();
-            size != lastSize && size.first > 0 && size.second > 0) {
-            lastSize = size;
-            glViewport(0, 0, size.first, size.second);
+        if (const auto res = app.syncViewport()) {
             app.shader("triangle").use();
-            app.shader("triangle")
-                .set("resolution", static_cast<float>(size.first), static_cast<float>(size.second));
+            app.shader("triangle").set("resolution", res->first, res->second);
         }
 
         Window::clearScreen();
 
         app.shader("triangle").use();
-        square.draw();
+        app.texture("wall").bind(0);
+        triangle.draw();
 
         app.pollAndSwap();
     }

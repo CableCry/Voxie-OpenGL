@@ -2,10 +2,12 @@
 
 #include "logging.hpp"
 #include "shader.hpp"
+#include "texture.hpp"
 
 #include <cassert>
 #include <expected>
 #include <glad/gl.h>
+#include <optional>
 #include <GLFW/glfw3.h>
 #include <string>
 #include <string_view>
@@ -178,6 +180,22 @@ auto Application::shader(std::string_view name) -> Shader& {
     return it->second;
 }
 
+auto Application::loadTexture(std::string name, std::string_view file,
+                              const Texture::Params& params) -> std::expected<void, std::string> {
+    auto tex = Texture::create(file, params);
+    if (!tex) {
+        return std::unexpected{std::move(tex.error())};
+    }
+    textures_.insert_or_assign(std::move(name), std::move(*tex));
+    return {};
+}
+
+auto Application::texture(std::string_view name) -> Texture& {
+    auto it = textures_.find(name);
+    assert(it != textures_.end() && "texture not loaded");
+    return it->second;
+}
+
 void Application::processInput() {
     if (window.isKeyPressed(GLFW_KEY_ESCAPE)) {
         window.requestClose();
@@ -190,6 +208,16 @@ void Application::processInput() {
         glPolygonMode(GL_FRONT_AND_BACK, debugMode_ ? GL_LINE : GL_FILL);
     }
     debugKeyDown_ = down;
+}
+
+auto Application::syncViewport() -> std::optional<std::pair<float, float>> {
+    const auto size = window.framebufferSize();
+    if (size == lastSize_ || size.first <= 0 || size.second <= 0) {
+        return std::nullopt;
+    }
+    lastSize_ = size;
+    glViewport(0, 0, size.first, size.second);
+    return std::pair{static_cast<float>(size.first), static_cast<float>(size.second)};
 }
 
 void Application::pollAndSwap() {

@@ -10,6 +10,7 @@ auto Mesh::create(std::span<const float> vertices, std::span<const GLuint> indic
     const GLsizeiptr iBytes = static_cast<GLsizeiptr>(indices.size_bytes());
 
     Mesh mesh;
+    mesh.vertexCount_ = static_cast<GLsizei>(vBytes / vertexStride);
     mesh.indexCount_ = static_cast<GLsizei>(indices.size());
     mesh.indexOffset_ = vBytes; // indices packed right after vertices
 
@@ -20,7 +21,9 @@ auto Mesh::create(std::span<const float> vertices, std::span<const GLuint> indic
     // SubData uploads below need it.
     glNamedBufferStorage(mesh.vbo_, vBytes + iBytes, nullptr, GL_DYNAMIC_STORAGE_BIT);
     glNamedBufferSubData(mesh.vbo_, 0, vBytes, vertices.data());
-    glNamedBufferSubData(mesh.vbo_, vBytes, iBytes, indices.data());
+    if (iBytes > 0) {
+        glNamedBufferSubData(mesh.vbo_, vBytes, iBytes, indices.data());
+    }
 
     for (const auto& a : attribs) {
         glEnableVertexArrayAttrib(mesh.vao_, a.location);
@@ -30,14 +33,20 @@ auto Mesh::create(std::span<const float> vertices, std::span<const GLuint> indic
     }
 
     glVertexArrayVertexBuffer(mesh.vao_, 0, mesh.vbo_, 0, vertexStride);
-    glVertexArrayElementBuffer(mesh.vao_, mesh.vbo_);
+    if (mesh.indexCount_ > 0) {
+        glVertexArrayElementBuffer(mesh.vao_, mesh.vbo_);
+    }
 
     return mesh;
 }
 
 void Mesh::draw(GLenum mode) const {
     glBindVertexArray(vao_);
-    glDrawElements(mode, indexCount_, GL_UNSIGNED_INT, reinterpret_cast<void*>(indexOffset_));
+    if (indexCount_ > 0) {
+        glDrawElements(mode, indexCount_, GL_UNSIGNED_INT, reinterpret_cast<void*>(indexOffset_));
+    } else {
+        glDrawArrays(mode, 0, vertexCount_);
+    }
 }
 
 Mesh::~Mesh() {
@@ -47,12 +56,14 @@ Mesh::~Mesh() {
 
 Mesh::Mesh(Mesh&& o) noexcept
     : vao_{std::exchange(o.vao_, 0)}, vbo_{std::exchange(o.vbo_, 0)},
-      indexCount_{std::exchange(o.indexCount_, 0)}, indexOffset_{std::exchange(o.indexOffset_, 0)} {
+      vertexCount_{std::exchange(o.vertexCount_, 0)}, indexCount_{std::exchange(o.indexCount_, 0)},
+      indexOffset_{std::exchange(o.indexOffset_, 0)} {
 }
 
 auto Mesh::operator=(Mesh&& o) noexcept -> Mesh& {
     std::swap(vao_, o.vao_);
     std::swap(vbo_, o.vbo_);
+    std::swap(vertexCount_, o.vertexCount_);
     std::swap(indexCount_, o.indexCount_);
     std::swap(indexOffset_, o.indexOffset_);
     return *this;
